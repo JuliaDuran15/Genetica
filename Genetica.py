@@ -2,12 +2,13 @@ import numpy as np
 import random
 import matplotlib.pyplot as plt
 from scipy.spatial.distance import euclidean
+import time
 
 # Definindo os parâmetros do problema
 num_points = 10  # número de pontos (pelo menos 8)
 pop_size = 100  # tamanho da população (quantidade de "soluções" simultâneas)
 max_generations = 1000  # número máximo de gerações (ou ciclos de melhoria)
-mutation_rate = 0.1  # taxa de mutação (10%)
+mutation_rate = 0.15  # taxa de mutação (15%)
 tournament_size = 5  # tamanho do torneio para seleção
 
 # Gerando pontos aleatórios para os dois cenários
@@ -59,7 +60,7 @@ def mutate(path, mutation_rate):
     return path
 
 # Executando o Algoritmo Genético
-def genetic_algorithm(points, pop_size, max_generations, mutation_rate):
+def genetic_algorithm(points, pop_size, max_generations, mutation_rate, scenario_name=""):
     # Criação da população inicial
     population = create_initial_population(pop_size, len(points))
     best_solution = None
@@ -94,17 +95,24 @@ def genetic_algorithm(points, pop_size, max_generations, mutation_rate):
         if len(history) > 200 and all(x == history[-1] for x in history[-200:]):
             break
 
+        # Mostrando solução intermediária a cada 100 gerações com o nome do cenário
+        if generation % 100 == 0:
+            print(f"Geração {generation}: Melhor distância = {best_distance:.2f} (Cenário: {scenario_name})")
+
     return best_solution, best_distance, history
 
 # Executa o algoritmo para os dois cenários
-best_uniform, dist_uniform, history_uniform = genetic_algorithm(points_uniform, pop_size, max_generations, mutation_rate)
-best_circle, dist_circle, history_circle = genetic_algorithm(points_circle, pop_size, max_generations, mutation_rate)
+start_time = time.time()
+best_uniform, dist_uniform, history_uniform = genetic_algorithm(points_uniform, pop_size, max_generations, mutation_rate, "Pontos Uniformes")
+time_uniform = time.time() - start_time
+
+start_time = time.time()
+best_circle, dist_circle, history_circle = genetic_algorithm(points_circle, pop_size, max_generations, mutation_rate, "Pontos Circulares")
+time_circle = time.time() - start_time
 
 # Exibe os resultados
-print(f"Melhor distância para pontos uniformes: {dist_uniform}")
-print(f"Melhor distância para pontos circulares: {dist_circle}")
-print(f"Gerações para pontos uniformes: {len(history_uniform)}")
-print(f"Gerações para pontos circulares: {len(history_circle)}")
+print(f"Melhor distância para pontos uniformes: {dist_uniform:.2f}, Tempo de execução: {time_uniform:.2f}s")
+print(f"Melhor distância para pontos circulares: {dist_circle:.2f}, Tempo de execução: {time_circle:.2f}s")
 
 # Gráfico da evolução da solução ao longo das gerações
 plt.figure(figsize=(12, 6))  # Aumenta o tamanho da figura
@@ -117,30 +125,14 @@ plt.legend(title='Cenário', fontsize=10)  # Adiciona um título à legenda
 plt.grid(True, linestyle='--', alpha=0.7)  # Grade mais suave
 plt.tight_layout()  # Ajusta automaticamente para que os elementos do gráfico não fiquem cortados
 plt.show()
-'''
-Explicações das Escolhas:
 
-Escolha de População e Critério de Parada:
+# Teste com uma quantidade alta de pontos para modelo circular (Bônus)
+large_num_points = 100  # cenário com mais pontos
+theta_large = np.linspace(0, 2 * np.pi, large_num_points, endpoint=False)
+points_large_circle = np.c_[50 + 40 * np.cos(theta_large), 50 + 40 * np.sin(theta_large)]
 
-Tamanho da população: 100 indivíduos, o que balanceia entre diversidade genética e tempo de processamento.
-Critério de parada: 1000 gerações ou 200 gerações sem melhora, para evitar longos tempos de execução sem 
-melhoria nas soluções.
-Escolha da Taxa de Mutação:
+start_time = time.time()
+best_large_circle, dist_large_circle, history_large_circle = genetic_algorithm(points_large_circle, pop_size, max_generations, mutation_rate, "Pontos Circulares (100 pontos)")
+time_large_circle = time.time() - start_time
 
-Taxa de mutação: 0.1 (10%), escolhida para permitir a introdução de diversidade genética sem causar mudanças 
-drásticas que comprometam as boas soluções já encontradas.
-Escolha da Representação do Gene e Cruzamento:
-
-Representação dos genes: Cada indivíduo é uma permutação dos índices dos pontos, garantindo que todas as cidades 
-sejam visitadas.
-Cruzamento: Order Crossover (OX) mantém a ordem relativa de alguns elementos dos pais, essencial em problemas de 
-permutação como o TSP.
-
-Função de Aptidão:
-
-Função de aptidão é inversa da distância total do percurso. Quanto menor a distância, maior a aptidão, 
-incentivando soluções que minimizam o caminho.
-Saída do Código
-O código exibe a melhor solução encontrada e o número de gerações necessárias para cada cenário, além de gerar
- um gráfico que mostra como a solução melhora ao longo das gerações.
-'''
+print(f"Melhor distância para 100 pontos circulares: {dist_large_circle:.2f}, Tempo de execução: {time_large_circle:.2f}s")
