@@ -5,74 +5,68 @@ from scipy.spatial.distance import euclidean
 import time
 
 # Definindo os parâmetros do problema
-num_points = 10  # número de pontos (pelo menos 8)
-pop_size = 100  # tamanho da população (quantidade de "soluções" simultâneas)
-max_generations = 1000  # número máximo de gerações (ou ciclos de melhoria)
-initial_mutation_rate = 0.1  # taxa de mutação inicial (10%)
-patience = 200  # número de gerações sem melhoria antes de parar
+num_points = 10  # número de pontos
+pop_size = 100  # tamanho da população
+max_generations = 1000  # número máximo de gerações
+initial_mutation_rate = 0.1  # taxa de mutação inicial
+patience = 200  # gerações sem melhoria antes de parar
 
-# Gerando pontos aleatórios para os dois cenários
-np.random.seed(42)  # para garantir que os resultados sejam reproduzíveis
+# Gerando pontos aleatórios para os cenários
+np.random.seed(42)
 points_uniform = np.random.rand(num_points, 2) * 100  # pontos distribuídos uniformemente
 theta = np.linspace(0, 2 * np.pi, num_points, endpoint=False)
-points_circle = np.c_[50 + 40 * np.cos(theta), 50 + 40 * np.sin(theta)]  # pontos dispostos em círculo
+points_circle = np.c_[50 + 40 * np.cos(theta), 50 + 40 * np.sin(theta)]  # pontos em círculo
 
 # Função auxiliar para calcular a distância total de um caminho
 def calculate_distance(path, points):
     return sum(euclidean(points[path[i]], points[path[i + 1]]) for i in range(len(path) - 1)) + \
            euclidean(points[path[-1]], points[path[0]])
 
-# Função de aptidão (quanto melhor a solução, maior a aptidão)
+# Função de aptidão (quanto menor a distância, maior a aptidão)
 def fitness(path, points):
-    return 1 / calculate_distance(path, points)  # quanto menor a distância, maior a aptidão
+    return 1 / calculate_distance(path, points)
 
 # Criação da população inicial (sequências aleatórias de pontos)
 def create_initial_population(pop_size, num_points):
     return [random.sample(range(num_points), num_points) for _ in range(pop_size)]
 
-# Seleção (usando o método do torneio)
+# Seleção (torneio)
 def tournament_selection(population, points, k=5):
-    selected = random.sample(population, k)  # escolhe 5 indivíduos aleatoriamente
-    selected.sort(key=lambda ind: fitness(ind, points), reverse=True)  # ordena do melhor para o pior
-    return selected[0]  # retorna o melhor indivíduo
+    selected = random.sample(population, k)
+    selected.sort(key=lambda ind: fitness(ind, points), reverse=True)
+    return selected[0]
 
 # Cruzamento do tipo Order Crossover (OX)
 def order_crossover(parent1, parent2):
     size = len(parent1)
-    a, b = sorted(random.sample(range(size), 2))  # escolhe dois pontos de corte aleatórios
+    a, b = sorted(random.sample(range(size), 2))
     child = [-1] * size
-    child[a:b] = parent1[a:b]  # copia uma parte do primeiro pai para o filho
+    child[a:b] = parent1[a:b]
 
     fill_pos = b
     for elem in parent2:
-        if elem not in child:  # preenche o restante do filho com genes do segundo pai
+        if elem not in child:
             if fill_pos >= size:
                 fill_pos = 0
             child[fill_pos] = elem
             fill_pos += 1
     return child
 
-# Mutação (troca duas posições aleatoriamente)
-def mutate(path, mutation_rate):
-    if random.random() < mutation_rate:  # aplica mutação com uma certa chance
-        i, j = random.sample(range(len(path)), 2)  # escolhe duas posições aleatórias
-        path[i], path[j] = path[j], path[i]  # troca os elementos de posição
+def inversion_mutation(path):
+    # Escolhe dois índices aleatórios para definir os limites da inversão
+    i, j = sorted(random.sample(range(len(path)), 2))
+    path[i:j+1] = reversed(path[i:j+1])  # inverte a subsequência entre os dois índices
     return path
 
-# Função para alterar a taxa de mutação dinamicamente a cada 1/4 das gerações
-def adjust_mutation_rate(generation, max_generations, initial_rate):
-    quarter = max_generations // 4
-    if generation < quarter:
-        return initial_rate  # Primeiro quarto de gerações
-    elif generation < 2 * quarter:
-        return initial_rate * 1.5  # Aumenta a taxa de mutação no segundo quarto
-    elif generation < 3 * quarter:
-        return initial_rate * 0.5  # Reduz a taxa de mutação no terceiro quarto
-    else:
-        return initial_rate * 0.25  # Reduz ainda mais a taxa de mutação no último quarto
+# Modificando a função para usar essa nova mutação em vez da original
+def mutate(path, mutation_rate, mutation_type="inversion"):
+    if random.random() < mutation_rate:  # aplica mutação com uma certa chance
+        if mutation_type == "inversion":
+            return inversion_mutation(path)
+    return path
 
-# Executando o Algoritmo Genético com critério de parada
-def genetic_algorithm(points, pop_size, max_generations, initial_mutation_rate, patience, scenario_name=""):
+# Executando o Algoritmo Genético com a nova função de mutação
+def genetic_algorithm(points, pop_size, max_generations, mutation_rate, patience, scenario_name=""):
     # Criação da população inicial
     population = create_initial_population(pop_size, len(points))
     best_solution = None
@@ -82,8 +76,6 @@ def genetic_algorithm(points, pop_size, max_generations, initial_mutation_rate, 
 
     # Iterando ao longo das gerações
     for generation in range(max_generations):
-        # Ajusta a taxa de mutação dinamicamente
-        mutation_rate = adjust_mutation_rate(generation, max_generations, initial_mutation_rate)
         
         new_population = []  # nova geração
         for _ in range(pop_size // 2):
@@ -92,8 +84,8 @@ def genetic_algorithm(points, pop_size, max_generations, initial_mutation_rate, 
             parent2 = tournament_selection(population, points)
             child1 = order_crossover(parent1, parent2)
             child2 = order_crossover(parent2, parent1)
-            # Adiciona os filhos mutados à nova população
-            new_population.extend([mutate(child1, mutation_rate), mutate(child2, mutation_rate)])
+            # Adiciona os filhos mutados à nova população usando a mutação de inversão
+            new_population.extend([mutate(child1, mutation_rate, "inversion"), mutate(child2, mutation_rate, "inversion")])
         
         # Substitui a população antiga pela nova
         population = new_population
@@ -121,7 +113,7 @@ def genetic_algorithm(points, pop_size, max_generations, initial_mutation_rate, 
 
     return best_solution, best_distance, history
 
-# Executa o algoritmo para os dois cenários
+# Executa o algoritmo para os dois cenários com a nova mutação
 start_time = time.time()
 best_uniform, dist_uniform, history_uniform = genetic_algorithm(points_uniform, pop_size, max_generations, initial_mutation_rate, patience, "Pontos Uniformes")
 time_uniform = time.time() - start_time
@@ -187,3 +179,38 @@ def execute_for_100_points():
 
 # Chama a função para executar o algoritmo com 100 pontos
 execute_for_100_points()
+
+'''
+1. População e Critério de Parada 
+
+População: Foi escolhida uma população de 100 indivíduos para manter um equilíbrio entre diversidade
+e capacidade de explorar boas soluções. Uma população maior poderia aumentar a diversidade, mas ao 
+custo de mais tempo de processamento. Populações menores podem convergir rapidamente, mas podem levar a 
+soluções subótimas, já que podem explorar menos o espaço de soluções.
+
+Critério de Parada: O critério de parada combina duas abordagens:
+1- Um número máximo de gerações (1000), para limitar o tempo de execução.
+2- Um critério de estagnação (patience = 200 gerações sem melhoria). Se não houver melhoria por 200 gerações 
+consecutivas, o algoritmo para.
+
+2. Taxa de Mutação
+
+A taxa de mutação foi definida como 10% (0.1). A escolha desse valor visa manter um equilíbrio entre a exploração 
+e a preservação de boas soluções
+
+3. Representação do Gene e Cruzamento
+
+Representação do Gene: A representação dos genes é uma lista de índices que indicam a ordem em que os pontos (cidades
+no caso do TSP) devem ser visitados. Isso é apropriado para problemas de ordenação como o TSP, onde a sequência dos genes
+é crucial para determinar a qualidade da solução.
+Cruzamento (Order Crossover - OX): O cruzamento utilizado é o Order Crossover (OX), ideal para problemas de ordenação, pois 
+garante que a ordem relativa dos elementos seja preservada. Ele combina duas soluções existentes de maneira eficiente, sem 
+introduzir duplicatas nem omitir genes, mantendo assim a validade das soluções.
+
+4. Função de Aptidão (fitness)
+A função de aptidão é baseada no inverso da distância total percorrida no caminho (rotação entre os pontos). Como o objetivo 
+do problema é minimizar a distância, a aptidão é inversamente proporcional à distância: soluções com distâncias menores terão 
+aptidões maiores.
+
+
+'''
